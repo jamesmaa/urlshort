@@ -1,6 +1,8 @@
-package urlshort
+package main
 
 import (
+	"fmt"
+	"github.com/go-yaml/yaml"
 	"net/http"
 )
 
@@ -12,7 +14,14 @@ import (
 // http.Handler will be called instead.
 func MapHandler(pathsToUrls map[string]string, fallback http.Handler) http.HandlerFunc {
 	//	TODO: Implement this...
-	return nil
+	return func(w http.ResponseWriter, r *http.Request) {
+		url, exists := pathsToUrls[r.URL.Path]
+		if !exists {
+			fallback.ServeHTTP(w, r)
+			return
+		}
+		http.Redirect(w, r, url, http.StatusSeeOther)
+	}
 }
 
 // YAMLHandler will parse the provided YAML and then return
@@ -31,7 +40,29 @@ func MapHandler(pathsToUrls map[string]string, fallback http.Handler) http.Handl
 //
 // See MapHandler to create a similar http.HandlerFunc via
 // a mapping of paths to urls.
+type UrlMap struct {
+	Path string `yaml:"path"`
+	URL  string `yaml:"url"`
+}
+
 func YAMLHandler(yml []byte, fallback http.Handler) (http.HandlerFunc, error) {
 	// TODO: Implement this...
-	return nil, nil
+	var redirectList []UrlMap
+	err := yaml.Unmarshal(yml, &redirectList)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	pathsToUrls := map[string]string{}
+	for _, red := range redirectList {
+		pathsToUrls[red.Path] = red.URL
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		url, exists := pathsToUrls[r.URL.Path]
+		if !exists {
+			fallback.ServeHTTP(w, r)
+			return
+		}
+		http.Redirect(w, r, url, http.StatusSeeOther)
+	}, nil
 }
